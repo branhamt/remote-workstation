@@ -98,14 +98,24 @@ The group_vars/terraform/vars.yml files references these variables. This can be 
 ```bash
 vim group_vars/terraform/vault.yml
 
-# Enter your AWS keys and save.
+# Enter your AWS keys (as below) and save.
+
+vault_aws_access_key_id: SOME_LONG_KEY_123
+vault_aws_secret_access_key: ANOTHER_LONG_KEY_456
+
+# Then do something like this (you should make up a password):
 
 echo mypassword1 > ~/.ansible_vault_password
-ansible-vault encrypt group_vars/terraform/vault.yml --vault-password-file ~/.ansible_vault_password
+
+ansible-vault encrypt group_vars/terraform/vault.yml \
+    --vault-password-file ~/.ansible_vault_password
+
 cat group_vars/terraform/vault.yml # See your encrypted file
 ```
 
-I run Ansible in a virtualenv and have settings in ansible.cfg and the hosts file to reflect that.
+### Note:
+
+I run Ansible in a virtualenv and have settings in ansible.cfg and the hosts file to reflect that. You may need to update those settings, depending on how your system is configured.
 
 ### A Minimal Terraform Config
 
@@ -125,6 +135,7 @@ terraform {
 
 **main.tf**
 
+```
 resource "aws_vpc" "proj_vpc" {
     cidr_block = "10.123.0.0/16"
     enable_dns_hostnames = true
@@ -134,5 +145,6 @@ resource "aws_vpc" "proj_vpc" {
         Name = "proj_vpc"
     }
 }
+```
 
 This is enough to set up and tear down a VPC on AWS.
