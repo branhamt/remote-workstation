@@ -6,8 +6,6 @@
   remote_user: ubuntu
   roles:
     - role: terraform
-  # vars_files:
-  #   - vars/tf_workstation.yml
   vars:
     destroy: yes
 
