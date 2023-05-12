@@ -1,0 +1,19 @@
+---
+# tags - apply-infra, destroy-infra, install, update, destroy
+- name: Manage Terraform
+  hosts: terraform
+  become: yes
+  remote_user: ubuntu
+  roles:
+    - role: terraform
+  # vars_files:
+  #   - vars/tf_workstation.yml
+  vars:
+    destroy: yes
+
+- name: Delete EC2 instance
+  hosts: local
+  roles:
+    - role: ec2
+  vars_files:
+    - group_vars/terraform/vars.yml

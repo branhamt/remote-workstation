@@ -1,0 +1,183 @@
+---
+# tags - create, destroy, update
+
+- name: Get info block
+  block:
+    - name: Get running instance info
+      ec2_instance_info:
+      register: ec2info
+    - name: Print instance info
+      debug: var="ec2info.instances"
+      when: print_instance_info
+  tags: ['always']
+
+- name: Create an EC2 key
+  block:
+    - name: Create the EC2 key
+      amazon.aws.ec2_key:
+        name: "{{ ssh_key_name }}"
+        region: "{{ aws_region }}"
+        force: true
+      register: ec2key
+    - name: Save the private key locally
+      ansible.builtin.copy:
+        content: "{{ ec2key.key.private_key }}"
+        dest: "{{ ssh_key_path_local }}"
+        mode: 0600
+      when: ec2key.changed
+  tags: ['create']
+
+- name: Terminate EC2 Block
+  block:
+  - name: Get EC2 instance info
+    amazon.aws.ec2_instance_info:
+      filters:
+        "tag:Name": "{{ host_name }}"
+    register: instance
+  - name: Terminate EC2 instances
+    amazon.aws.ec2_instance:
+      state: terminated
+      name: "{{ ssh_key_name }}"
+    register: terminated_instances
+  - name: Remove the EC2 key
+    amazon.aws.ec2_key:
+      name: "{{ ssh_key_name }}"
+      state: absent
+  - name: Remove security group
+    amazon.aws.ec2_security_group:
+      name: "{{ host_name }} SSH"
+      state: absent
+  - name: Delete local ssh key
+    ansible.builtin.file:
+      path: "{{ ssh_key_path_local }}"
+      state: absent
+  # TODO Remove known hosts entry
+  - name: Update local ansible hosts file
+    ansible.builtin.lineinfile:
+      path: ./hosts
+      search_string: "{{ host_name }}"
+      state: absent
+  - name: Remove block from local .ssh/config
+    ansible.builtin.blockinfile:
+      path: ~/.ssh/config
+      state: absent
+      block: |
+        Host {{ host_name }}
+            IdentityFile {{ ssh_key_path_local }}
+            IdentitiesOnly yes
+            User ubuntu
+            Hostname {{ item.public_ip_address }}
+            StrictHostKeyChecking no
+            UserKnownHostsFile ~/.ssh/known_hosts_amz
+    loop: "{{ instance.instances }}"
+    when: item.public_ip_address is defined
+  tags: ['never', 'destroy']
+
+- name: Create EC2 ssh security group
+  block:
+  - name: Create security group
+    amazon.aws.ec2_security_group:
+      name: "{{ host_name }} SSH"
+      description: SSH access for instance
+      region: "{{ aws_region }}"
+      rules:
+        - proto: tcp
+          ports: 22
+          cidr_ip: 0.0.0.0/0
+          rule_desc: allow all ssh on port 22
+    register: security_group
+  tags: ['never', 'create']
+
+- name: Create EC2 Block
+  block:
+  - name: Create EC2 instances
+    amazon.aws.ec2_instance:
+      name: "{{ ssh_key_name }}"
+      region: "{{ aws_region }}"
+      availability_zone: "{{ availability_zone }}"
+      key_name: "{{ ssh_key_name }}"
+      instance_type: "{{ instance_type }}"
+      image_id: "{{ image_id }}"
+      state: running
+      user_data: |
+        #!/bin/bash
+        # sudo apt update && sudo apt upgrade
+      security_groups: ['default', "{{ security_group.group_id }}"]
+      network:
+        assign_public_ip: true
+    register: ec2
+
+  - name: Pause to wait for the instance to come up
+    ansible.builtin.pause:
+      seconds: "{{ ec2_create_pause_seconds }}"
+
+  - name: Wait for ssh to come up on instance
+    local_action:
+      module: wait_for
+      host: "{{ item.public_ip_address }}"
+      port: 22
+      delay: 10
+      timeout: 120
+      sleep: 5
+      state: started
+    loop: "{{ ec2.instances }}"
+
+  - name: Update local .ssh/config
+    ansible.builtin.blockinfile:
+      path: ~/.ssh/config
+      backup: "{{ backup_ssh_config }}"
+      block: |
+        Host {{ host_name }}
+            IdentityFile {{ ssh_key_path_local }}
+            IdentitiesOnly yes
+            User ubuntu
+            Hostname {{ item.public_ip_address }}
+            StrictHostKeyChecking no
+            UserKnownHostsFile ~/.ssh/known_hosts_amz
+    loop: "{{ ec2.instances }}"
+    # TODO
+    # when: ec2key.changed
+
+  - name: Ensure there is a group line for our instances in hosts file
+    ansible.builtin.lineinfile:
+      path: ./hosts
+      line: "[{{ inventory_host_groups }}]"
+      state: present
+
+  - name: Update local ansible hosts file
+    ansible.builtin.lineinfile:
+      path: ./hosts
+      line: "{{ host_name }}"
+      insertafter: "[{{ inventory_host_groups }}]"
+      state: present
+
+  # - name: Ensure there is a group line for instances w/aws auth in hosts
+  #   ansible.builtin.lineinfile:
+  #     path: ./hosts
+  #     line: "[aws_auth]"
+  #     state: present
+
+  # - name: Update local ansible hosts file
+  #   ansible.builtin.lineinfile:
+  #     path: ./hosts
+  #     line: "{{ host_name }}"
+  #     insertafter: "[aws_auth]"
+  #     state: present
+  #   when: aws_auth
+
+  - name: print
+    debug: var="item.public_ip_address"
+    loop: "{{ ec2.instances }}"
+
+  tags: ['never', 'create']
+
+- name: Get IP address block
+  block:
+    - name: Get IP address
+      ansible.builtin.command:
+        cmd: aws ec2 describe-instances --filters "Name=tag:Name,Values={{ host_name}}" --query "Reservations[].Instances[].PublicIpAddress" --output text
+
+      register: ip_address
+
+    - debug: var="ip_address"
+  tags: ['ip']

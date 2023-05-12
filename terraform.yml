@@ -1,0 +1,41 @@
+---
+# tags - apply-infra, destroy-infra, install, update, destroy
+- name: Create EC2 instance
+  hosts: local
+  roles:
+    - role: ec2
+  vars_files:
+    - group_vars/terraform/vars.yml
+  post_tasks:
+    - name: Refresh inventory
+      ansible.builtin.meta: refresh_inventory
+      tags: ['create']
+
+- name: Run roles on install
+  tags: ['create']
+  hosts: terraform
+  become: yes
+  remote_user: ubuntu
+  roles:
+    - role: aws_auth
+  # vars_files:
+  #   - vars/tf_workstation.yml
+
+- name: Other roles
+  hosts: terraform
+  become: yes
+  remote_user: ubuntu
+  roles:
+    - role: common
+    - role: auto_shutdown
+  # vars_files:
+  #   - vars/tf_workstation.yml
+
+- name: Manage Terraform
+  hosts: terraform
+  become: yes
+  remote_user: ubuntu
+  roles:
+    - role: terraform
+  # vars_files:
+  #   - vars/tf_workstation.yml

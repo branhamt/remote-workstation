@@ -1,0 +1,30 @@
+---
+- name: Install net-tools for netstat
+  ansible.builtin.apt:
+    pkg: net-tools
+    state: present
+
+- name: Create scripts directory
+  file:
+    path: /home/ubuntu/.scripts
+    state: directory
+    mode: 0755
+    owner: ubuntu
+    group: ubuntu
+
+- name: Copy shutdown-if-inactive script
+  copy:
+    src: ./files/shutdown-if-inactive
+    dest: /home/ubuntu/.scripts/shutdown-if-inactive
+    owner: ubuntu
+    group: ubuntu
+    mode: 0744
+
+- name: Create cronjob to call shutdown-if-inactive
+  become: yes
+  become_user: root
+  cron:
+    name: shutdown-if-inactive
+    user: root
+    minute: "{{ auto_shutdown_cron_minutes_entry }}"
+    job: "/home/ubuntu/.scripts/shutdown-if-inactive"

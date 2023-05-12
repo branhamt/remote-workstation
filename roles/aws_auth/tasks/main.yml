@@ -1,0 +1,27 @@
+---
+
+- name: Setup AWS Authentication
+  block:
+    - name: Add authentication keys to .bashrc
+      ansible.builtin.lineinfile:
+        path: /home/ubuntu/.bashrc
+        line: "{{ item }}"
+        state: present
+      loop:
+        - "export AWS_ACCESS_KEY_ID={{ aws_access_key_id }}"
+        - "export AWS_SECRET_ACCESS_KEY={{ aws_secret_access_key }}"
+        - "export AWS_REGION={{ aws_region }}"
+
+  # - name: Ensure there is a group line for instances w/aws auth in hosts
+  #   ansible.builtin.lineinfile:
+  #     path: ./hosts
+  #     line: [aws_auth]
+  #     state: present
+
+  # - name: Update local ansible hosts file
+  #   ansible.builtin.lineinfile:
+  #     path: ./hosts
+  #     line: "{{ host_name }}"
+  #     insertafter: [aws_auth]
+  #     state: present
+  #   when: aws_auth

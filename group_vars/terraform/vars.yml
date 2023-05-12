@@ -1,0 +1,22 @@
+project: tf-workstation
+unit: terraform
+aws_region: us-east-1
+availability_zone: us-east-1a
+instance_type: t2.micro
+image_id: ami-007855ac798b5175e # Ubuntu 22.04
+inventory_host_groups: "{{ unit }}"
+host_name: "{{ project }}"
+ssh_key_name: "{{ project }}"
+ssh_key_path_local: "~/.ssh/{{ ssh_key_name }}.pem"
+backup_ssh_config: false
+print_instance_info: false
+bash_profile_logout_seconds: 1200
+infra_local_path: ~/projects/test_projects/proj
+infra_remote_path: /home/ubuntu/
+infra_remote_dir: proj
+terraform_path: "{{ infra_remote_path }}{{ infra_remote_dir }}"
+install_software:
+  - vim
+encrypt_volume: false # not implemented
+aws_access_key_id: "{{ vault_aws_access_key_id }}"
+aws_secret_access_key: "{{ vault_aws_secret_access_key }}"
