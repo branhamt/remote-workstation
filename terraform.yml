@@ -20,6 +20,7 @@
     - role: aws_auth
 
 - name: Other roles
+  tags: ['create', 'install', 'update']
   hosts: terraform
   become: yes
   remote_user: ubuntu
